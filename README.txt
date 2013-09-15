@@ -1,3 +1,5 @@
-Loop the loop
+Loop the Loop
 
-Puzzle also known by the name Slither-Link
+Puzzle also known by the name Slither-Link.
+
+Very popular game.

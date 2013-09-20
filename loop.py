@@ -68,15 +68,10 @@ class lineArray(object):
         s = ""
         for row in self.lines:
             line = " ".join([constants.get(i,i) for i in row])
-            '''
-            line = line.replace('-1','.')
-            line = line.replace('0',' ')
-            line = line.replace('2','x').replace('3',' ')
-            '''
-            if row[0] == -1:    # horizontal lines row
-                line = line.replace('1', '_')
+            if row[0] == DOT:    # horizontal lines row
+                line = line.replace(LINE, '_')
             else:              # vertical lines row
-                line = line.replace('1', '|')
+                line = line.replace(LINE, '|')
             s += line + '\n'
         return s
 

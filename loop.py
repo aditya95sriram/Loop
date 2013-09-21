@@ -74,7 +74,15 @@ class lineArray(object):
                 line = line.replace(LINE, '|')
             s += line + '\n'
         return s
-
+    
+    def inject(self, numArray):
+        for y, row in enumerate(numArray):
+            for x, cell in enumerate(row):
+                if cell != -1:
+                    self.lines[2*y + 1, 2*x + 1] = str(cell)
+                else:
+                    self.lines[2*y + 1, 2*x + 1] = ' '
+                
 class loopBoard(object):
 
     order = 7
@@ -98,12 +106,21 @@ puzzle1 = [(0,1),(0,3),(0,7),(0,13),
            (13,0),(13,2),(13,4),(13,6),(13,8),(13,10),(13,12),(13,14),
            (14,1),(14,5),(14,9),(14,13)]
 
+num1 = array([[ 3, 2, 3, 3, 2, 1, 3],
+              [ 3,-1, 2,-1,-1,-1, 2],
+              [ 3,-1, 3, 2, 2, 2, 2],
+              [-1,-1,-1,-1,-1, 2, 2],
+              [ 1, 2,-1,-1, 2,-1, 2],
+              [-1, 2,-1,-1, 0, 2, 2],
+              [-1, 3,-1, 3, 3, 3,-1]])
+
 if __name__ == "__main__":
     DEBUG_MODE = False
     l = lineArray()
     a = l.lines
-    print '\n', l, '\n'
     for p in puzzle1: a[p] = LINE
+    print
+    l.inject(num1)
     print '\n', l, '\n'
 
 

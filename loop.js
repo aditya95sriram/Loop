@@ -18,7 +18,15 @@ $(document).ready(function() {
         paste_expire = '10M',
         paste_format = 'python',
         api_url      = 'http://pastebin.com/api/api_post.php';
-        
+    
+    var refine = function(n) {
+        if (n<0) {
+            return n.toString();
+        } else {
+            return ' ' + n.toString();
+        }
+    }
+    
     var line = function(dir, y, x) {
         s = '<div class="element {0}-line line" id="{1}-{2}"></div>';
         return s.replace("{0}", dir).replace("{1}", y).replace("{2}", x); 
@@ -69,8 +77,8 @@ $(document).ready(function() {
         
     $('.entry').click(function() {
         var s = (this.id).split("-");
-        var n = prompt("Number");
-        $(this).text(n);
+        var n = parseInt(prompt("Number"))||(-1);
+        if (n!=(-1)) { $(this).text(n) }
         numArray[parseInt(s[0])][parseInt(s[1])] = parseInt(n);
         console.log(parseInt(s[0]), parseInt(s[1]));
         console.log(numArray);
@@ -78,11 +86,23 @@ $(document).ready(function() {
     
     $('#panel').click(function() {
     
-        s = "[["
-        s += numArray.join("],<br>&nbsp;[")
-        s += "]]"
-        $('#text p').html(s);
-        
+        s = "["
+        for (var i=0; i<7; i++) {
+            s += "["
+            for (var j=0; j<7; j++) {
+                s += refine(numArray[i][j])
+                if (j!=6) {
+                    s += ","
+                }
+            }
+            s += "]"
+            if (i!=6) {
+                s += ",<br>&nbsp;"
+            } else {
+                s += "]"
+            }
+        }
+        $('#text p').html(s)
         /*
         $.ajax({type    : "POST",
                 url     : api_url,

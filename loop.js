@@ -28,12 +28,12 @@ $(document).ready(function() {
     }
     
     var line = function(dir, y, x) {
-        s = '<div class="element {0}-line line" id="{1}-{2}"></div>';
-        return s.replace("{0}", dir).replace("{1}", y).replace("{2}", x); 
+        s = '<div class="element {0}-line line" id="{0}{1}-{2}"></div>';
+        return s.replace(/\{0\}/g, dir).replace("{1}", y).replace("{2}", x); 
     }
     
     var entry = function(y, x) {
-        s = '<div class="element entry" id="{0}-{1}"></div>';
+        s = '<div class="element entry" id="e{0}-{1}"></div>';
         return s.replace("{0}", y).replace("{1}", x);
     }
     
@@ -60,6 +60,28 @@ $(document).ready(function() {
             printV(2*j + 1);
         }
         printH(2*7);
+        if (location.search) { // only if url-parameters are passed
+            array = location.search.split("=")[1]; //encoded array string
+            array = decodeURIComponent(array)      //decoded array string
+            numArray = eval(array);                //array
+            console.log("Numeric Array via URL: ", numArray);
+            config();
+        }
+    }
+    
+    var config = function() { //update 'entry' elements as per numArray
+        var n;
+        for (var i=0; i<7; i++) {
+            for (var j=0; j<7; j++) {
+                n = numArray[i][j]
+                if (n<0) { // -1 -> ''
+                    n = "";
+                } else {   //  x -> 'x' (0 <= x <= 4)
+                    n = n.toString();
+                }
+                $('#e' + i + '-' + j).text(n)
+            }
+        }
     }
     
     init();

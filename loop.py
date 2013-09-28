@@ -1,4 +1,4 @@
-import os
+import os, urllib, subprocess
 
 def log(m):
     global DEBUG_MODE
@@ -162,10 +162,29 @@ class Board(object):
                 else:
                     self.lines[2*y + 1, 2*x + 1] = ' '
 
-    def edit(self):
-        os.startfile(r"H:\My DOcs\Portable Python\Scripts\GUI\Loop\loop.html")
-        a = eval(raw_input("Array: \n"))
-        if a: self.numArray = a
+    def view(self):
+        if self.numArray:
+            param = str(self.numArray).replace(' ','')
+        else:
+            param = ""
+
+        htmlFile = urllib.quote("H:/My Docs/Portable Python/Scripts/GUI/Loop/loop.html", safe=":/")
+        query = "?" + urllib.urlencode([('param', param)])
+        commandStr = "start chrome file:///" + htmlFile + query
+        print commandStr
+        subprocess.call(commandStr, shell=True)
+
+class Solver(object):
+
+    def __init__(self, numArray):
+        """
+        'numArray' must be an array of just the numbers.
+        """
+        self.numArray = numArray
+        self.puzzle = Board()
+
+    def basicElim(self):
+        pass
 
 puzzles = [array([[ 3, 2, 3, 3, 2, 1, 3],
                   [ 3,-1, 2,-1,-1,-1, 2],
@@ -211,6 +230,7 @@ solution1 = [(0,1),(0,3),(0,7),(0,13),
            (12,3),(12,7),(12,11),
            (13,0),(13,2),(13,4),(13,6),(13,8),(13,10),(13,12),(13,14),
            (14,1),(14,5),(14,9),(14,13)]
+
 if __name__ == "__main__":
     DEBUG_MODE = False
     b = Board()

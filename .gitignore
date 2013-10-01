@@ -1,3 +1,4 @@
 # gitignore for loop
 
 *.pyc
+*.config

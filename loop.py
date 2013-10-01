@@ -1,9 +1,5 @@
 import os, urllib, subprocess
 
-def log(m):
-    global DEBUG_MODE
-    if DEBUG_MODE: print m
-
 def isindex(i):
     try:
         #check if i is an iterable
@@ -17,16 +13,25 @@ class array(list):
 
     def __getitem__(self, key):
         if isindex(key):
-            log("Iterator passed to numArray")
             return (list.__getitem__(self, key[0]))[key[1]]
         else:
-            log("No iterator passed to numArray")
             return list.__getitem__(self, key)
 
     def __setitem__(self, key, item):
         row = self[key[0]]
         row[key[1]] = item
         list.__setitem__(self, key[0], row)
+
+    def neighbors(self, key, diagonal=True):
+        if isindex(key):
+            y, x = key
+            nOffsets = [(i,j) for i in (-1,0,1) for j in (-1,0,1)]
+            nOffsets.remove((0,0))
+            if not diagonal:
+                for c in [(i,j) for i in (-1,1) for j in (-1,1)]:
+                    nOffsets.remove(c)
+        else:
+            raise ValueError("Parameter 'key' must be tuple")
 
 class Board(object):
     """Class for maintaining state of individual lines in the
@@ -43,6 +48,7 @@ class Board(object):
     Any other number represents numeral in the puzzle
     """
     order = 7
+    browser = 'chrome'  # default
 
     # Constants
     DOT = '9'
@@ -74,6 +80,8 @@ class Board(object):
                     tempLine.append(Board.NUMBER if n%2 else Board.NOLINE)
                 tempArray.append(tempLine)
         self.lines = array(tempArray)
+        # path where this file is stored, used in 'view' function
+        self.path = __file__
 
     def display(self, outArray = False):
         if outArray:  # output required in array format
@@ -162,15 +170,38 @@ class Board(object):
                 else:
                     self.lines[2*y + 1, 2*x + 1] = ' '
 
+    def inputNum(self):
+        """
+        Valid input format (line by line)
+
+        ..33323
+        3120..3
+        122..22
+        ....2..
+        ..1.322
+        2.2...2
+        ..32322
+
+        """
+        tempArray = []
+        s = ""
+        for i in range(7):
+            s = raw_input("Row #{}".format(i))
+            a = [(int(n) if n!='.' else (-1)) for n in s]
+            tempArray.append(a)
+        self.inject(tempArray)
+
     def view(self):
+        b = Board.browser
         if self.numArray:
             param = str(self.numArray).replace(' ','')
         else:
             param = ""
-
-        htmlFile = urllib.quote("H:/My Docs/Portable Python/Scripts/GUI/Loop/loop.html", safe=":/")
+        htmlFile = self.path.replace('\\','/').replace('.py', '.html')
+        htmlFile = urllib.quote(htmlFile, safe=":/")
+        print "HTML", htmlFile
         query = "?" + urllib.urlencode([('param', param)])
-        commandStr = "start chrome file:///" + htmlFile + query
+        commandStr = "start {} file:///".format(b) + htmlFile + query
         print commandStr
         subprocess.call(commandStr, shell=True)
 
@@ -183,8 +214,30 @@ class Solver(object):
         self.numArray = numArray
         self.puzzle = Board()
 
+    def iterCells(self):
+        """
+        Returns generator to iterate over all cell indices
+        """
+        return ((2*i+1, 2*j+1) for i in range(7) for j in range(7))
+
+    def iterDots(self):
+        """
+        Returns generator to iterate over all dots (points where
+        lines meet).
+        """
+        return ((2*i, 2*j) for i in range(8) for j in range(8))
+
     def basicElim(self):
-        pass
+        """
+        Works on 2 basic rules
+        1) If a numbered cell is surrounded by the same number of lines,
+           the remaining positions surrounding it must all be 'crosses'
+        2) If a numbered cell has just the same number of positions
+           left and with the others being 'crosses', the remaining positions
+           surrounding it must all be 'lines'.
+        """
+        for c in self.iterCells():
+            pass
 
 puzzles = [array([[ 3, 2, 3, 3, 2, 1, 3],
                   [ 3,-1, 2,-1,-1,-1, 2],
@@ -213,7 +266,28 @@ puzzles = [array([[ 3, 2, 3, 3, 2, 1, 3],
                   [-1, 2,-1,-1,-1,-1,-1],
                   [ 1, 3,-1,-1, 2,-1, 2],
                   [ 2, 2, 1, 3,-1,-1, 2],
-                  [-1, 2,-1,-1, 2, 3,-1]])]
+                  [-1, 2,-1,-1, 2, 3,-1]]),
+           array([[-1,-1,-1,-1, 2, 2, 2],
+                  [ 2,-1,-1, 2,-1,-1,-1],
+                  [ 2, 2,-1, 2, 1, 1,-1],
+                  [ 1, 2,-1, 3, 2,-1, 2],
+                  [-1, 3,-1, 3, 0,-1, 2],
+                  [-1, 2, 2, 3, 2,-1,-1],
+                  [ 2, 1,-1, 2,-1,-1, 3]]),
+           array([[-1, 2,-1, 3, 3, 3,-1],  # good one
+                  [-1, 3, 2, 2,-1, 0, 3],
+                  [-1,-1,-1, 1,-1,-1, 3],
+                  [-1,-1,-1,-1,-1,-1, 2],
+                  [-1, 2, 1,-1,-1,-1, 3],
+                  [-1,-1, 1,-1,-1,-1, 2],
+                  [-1,-1, 2, 3, 1,-1,-1]]),
+           array([[-1, 1,-1,-1,-1,-1, 3],
+                  [-1,-1,-1,-1,-1,-1, 2],
+                  [ 3,-1, 3,-1,-1,-1, 3],
+                  [ 3,-1, 2, 1, 3, 0, 3],
+                  [ 2,-1,-1,-1,-1,-1, 3],
+                  [ 3, 3, 3, 3, 2,-1, 2],
+                  [-1,-1,-1,-1,-1, 3, 3]])]
 
 solution1 = [(0,1),(0,3),(0,7),(0,13),
            (1,0),(1,4),(1,6),(1,8),(1,12),(1,14),
@@ -231,13 +305,42 @@ solution1 = [(0,1),(0,3),(0,7),(0,13),
            (13,0),(13,2),(13,4),(13,6),(13,8),(13,10),(13,12),(13,14),
            (14,1),(14,5),(14,9),(14,13)]
 
-if __name__ == "__main__":
-    DEBUG_MODE = False
+
+
+def main():
     b = Board()
-    #for p in puzzle1: b.lines[p] = Board.LINE
-    b.inject(puzzles[1])
+    #for p in solution1: b.lines[p] = Board.LINE
+    b.inject(puzzles[0])
     #print l
     b.pretty()
+    return b
+
+def config():
+    try:
+        f = open(__file__.replace('.py','.config'), "r")
+    except IOError:
+        choice = input("""
+        Which browser would you like to be associated with this file ?
+        1. Google Chrome
+        2. Mozilla Firefox
+        3. Opera
+        4. Internet Explorer
+
+        Enter 1, 2, 3, or 4:
+        """)
+        browsers = ["chrome", "firefox", "opera", "iexplore"]
+        Board.browser = browsers[choice-1]
+        with open(__file__.replace('.py','.config'), "w") as f:
+            f.write(str([Board.browser]))
+    else:
+        Board.browser = eval(f.readline())[0]
+        f.close()
+
+if __name__ == "__main__":
+    print os.path.realpath(__file__)
+    config()
+    b = main()
+    n = b.numArray
 
 
 

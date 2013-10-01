@@ -60,8 +60,8 @@ $(document).ready(function() {
             printV(2*j + 1);
         }
         printH(2*7);
-        if (location.search) { // only if url-parameters are passed
-            array = location.search.split("=")[1]; //encoded array string
+        if (window.location.search) { // only if url-parameters are passed
+            array = window.location.search.split("=")[1]; //encoded array string
             array = decodeURIComponent(array)      //decoded array string
             numArray = eval(array);                //array
             console.log("Numeric Array via URL: ", numArray);

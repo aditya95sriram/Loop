@@ -26,7 +26,7 @@ class array(list):
         row[key[1]] = item
         list.__setitem__(self, key[0], row)
 
-    def _neighbors(self, key, maxIndex, diagonal=True):
+    def old_neighbors(self, key, maxIndex, diagonal=True):
         """
         Legacy 'neighbors' function, retained for historic reasons,
         as well as some interesting twisted code logic used in
@@ -80,6 +80,42 @@ class array(list):
         else:
             raise ValueError("Parameter 'key' must be 2-tuple")
 
+    def find(self, item):
+        """
+        Returns first position where item is found, and -1 if item isn't in
+        array.
+        """
+        for i in range(len(self)):
+            if item in self[i]:
+                return (i, self[i].index(item))
+        else:
+            return -1
+
+    def findAll(self, item):
+        """
+        Returns all the positions of an item in an array as a generator
+        """
+        p = []
+        for i in range(len(self)):
+            for j in range(len(self[0])):
+                if self[i,j] == item:
+                    p.append((i,j))
+        return (i for i in p)
+
+    def count(self, item):
+        """
+        Returns number of times an item is seen in an array
+        """
+        n = 0
+        for i in range(len(self)):
+            n += self[i].count(item)
+        return n
+
+    def size(self):
+        """
+        Returns size of array as a 2-tuple
+        """
+        return (len(self), len(self[0]))
 
 class Board(object):
     """Class for maintaining state of individual lines in the
@@ -114,7 +150,8 @@ class Board(object):
                   "RIGHT_TOP"   : chr(200),
                   "RIGHT_BOTTOM": chr(201)}
 
-    def __init__(self):
+    def __init__(self, debug = True):
+        self.debugMode = debug
         order, tempArray = Board.order, []
         for i in range(2*order + 1):
             if i % 2 == 0:  # horizontal lines row
@@ -130,6 +167,9 @@ class Board(object):
         self.lineArray = array(tempArray)
         # path where this file is stored, used in 'view' function
         self.path = __file__
+
+    def log(self, m):
+        if self.debugMode: print m
 
     def display(self, outArray = False):
         if outArray:  # output required in array format
@@ -233,11 +273,25 @@ class Board(object):
         """
         tempArray = []
         s = ""
-        for i in range(7):
-            s = raw_input("Row #{}".format(i))
-            a = [(int(n) if n!='.' else (-1)) for n in s]
-            tempArray.append(a)
-        self.inject(tempArray)
+        try:
+            for i in range(7):
+                s = raw_input("Row #{}".format(i+1))
+                if len(s)==7:
+                    a = [(int(n) if n!='.' else (-1)) for n in s]
+                    tempArray.append(a)
+                    if not all(map(lambda c: c<=3, a)):
+                        print "Invalid row entry at row#{}".format(i+1)
+                        return False
+                else:
+                    print "Row#{} length not equal to 7".format(i+1)
+                    return False
+        except KeyboardInterrupt:
+                print "Array not stored"
+                return False
+        else:
+            self.inject(tempArray)
+            print "Array stored"
+            return True
 
     def view(self):
         b = Board.browser
@@ -247,11 +301,12 @@ class Board(object):
             param = ""
         htmlFile = self.path.replace('\\','/').replace('.py', '.html')
         htmlFile = urllib.quote(htmlFile, safe=":/")
-        print "HTML", htmlFile
+        self.log("HTML " + htmlFile)
         query = "?" + urllib.urlencode([('param', param)])
         commandStr = "start {} file:///".format(b) + htmlFile + query
-        print commandStr
+        self.log(commandStr)
         subprocess.call(commandStr, shell=True)
+
 
 
 class Solver(object):
@@ -262,9 +317,8 @@ class Solver(object):
     LINE = '7'
     CROSS = '6'
     NUMBER = '5'
-    constants = dict(zip([DOT,NOLINE,CROSS], ['.',' ','x']))
 
-    def __init__(self, numArray):
+    def __init__(self, numArray, debug = True):
         """
         'numArray' must be an array of just the numbers.
         """
@@ -272,6 +326,10 @@ class Solver(object):
         self.puzzle = Board()
         self.puzzle.inject(self.numArray)
         self.maxIndex = 14
+        self.debugMode = debug
+
+    def log(self, m):
+        if self.debugMode: print m
 
     def iterCells(self):
         """
@@ -286,7 +344,23 @@ class Solver(object):
         """
         return ((2*i, 2*j) for i in range(8) for j in range(8))
 
-    def basicElim(self):
+    def sortNeighbors(self, cell):
+        """
+        Returns a 3 tuple containing lists of positions/coordinates of the
+        'lines', 'crosses' and 'blanks' (in that order) surrounding the given
+        cell.
+        """
+        lines, crosses, blanks = [], [], []
+        for n in self.puzzle.lineArray.neighbors(cell, self.maxIndex, False):
+            if self.puzzle.lineArray[n] == Solver.LINE:
+                lines.append(n)
+            elif self.puzzle.lineArray[n] == Solver.CROSS:
+                crosses.append(n)
+            else:
+                blanks.append(n)
+        return (lines, crosses, blanks)
+
+    def basicElim(self, cell):
         """
         Works on 2 basic rules
         1) If a numbered cell is surrounded by the same number of lines,
@@ -294,29 +368,42 @@ class Solver(object):
         2) If a numbered cell has just the same number of positions
            left and with the others being 'crosses', the remaining positions
            surrounding it must all be 'lines'.
+
+        Applies these rules only to the given cell and returns True if anything
+        fruitful could be concluded, and False if no changes were made.
         """
         a = self.puzzle.lineArray
-        for c in self.iterCells():
-            if a[c]!=' ':
-                if a[c] == '0':
-                    pass
-                num = int(a[c])
-                crosses, lines, blanks = [], [], []
-                for n in a.neighbors(c, self.maxIndex, False):
-                    if a[n] == Solver.CROSS:
-                        crosses.append(n)
-                    elif a[n] == Solver.LINE:
-                        lines.append(n)
-                    elif a[n] == Solver.NOLINE:
-                        blanks.append(n)
+        effective = False
+        if a[cell] == ' ':
+            return False
+        else:
+            num = int(a[cell])
+            lines, crosses, blanks = self.sortNeighbors(cell)
+            if len(blanks) != 0:
                 if len(lines) == num:
-                    print "Found completed lines: {}".format(blanks)
+                    effective = True
+                    self.log("Found completed lines: {}".format(blanks))
                     for toCross in blanks:
                         a[toCross] = Solver.CROSS
                 elif len(crosses) == (4 - num):
-                    print "Found completed crosses {}".format(blanks)
+                    effective = True
+                    self.log("Found completed crosses: {}".format(blanks))
                     for toLine in blanks:
                         a[toLine] = Solver.LINE
+            return effective
+
+    def basicElimFull(self):
+        """
+        Applies 'basicElim' to each cell sequentially and collectively
+        returns True if even a single 'basicElim' function was effective or
+        in other words, even a single change was made; and returns False for
+        rest of the cases.
+        """
+        effective = False
+        a = self.puzzle.lineArray
+        for cell in self.iterCells():
+            effective = effective or self.basicElim(cell)
+        return effective
 
     def dotElim(self):
         """
@@ -332,6 +419,7 @@ class Solver(object):
         3) If only one line is filled in and all except one of the remaining are
            crosses the remaining position must be a line.
         """
+        effective = False
         a = self.puzzle.lineArray
         for dot in self.iterDots():
             crosses, lines, blanks = [], [], []
@@ -342,20 +430,80 @@ class Solver(object):
                     crosses.append(l)
                 else:
                     blanks.append(l)
-            if len(lines) == 2:
-                print "Found 2 line pair at {}".format(l)
+            if len(lines) == 2 and len(blanks)!=0:
+                effective = True
+                self.log("Found 2 line pair at {}".format(l))
                 for toCross in blanks:
                     a[toCross] = Solver.CROSS
             t = len(lines) + len(crosses) + len(blanks)  # total possible lines
             if len(blanks)==1:
                 if len(crosses) == t-1:  # number of crosses is 1 less than 't'
+                    effective = True
+                    self.log("Found cross compulsion at {}".format(l))
                     a[blanks[0]] = Solver.CROSS
-                    print "Found cross compulsion at {}".format(l)
                 if len(lines) == 1:      # one blank, one line, remaining cross
+                    effective = True
+                    self.log("Found line compulsion at {}".format(l))
                     a[blanks[0]] = Solver.LINE
-                    print "Found line compulsion at {}".format(l)
+        return effective
+
+    def isComplete(self):
+        """
+        Checks if the completely solved puzzle is the correct solution
+        """
+        a = self.puzzle.numArray
+        for c in self.iterCells():
+            if a[c]!=' ':
+                num = int(a[c])
+                lines = 0
+                for n in a.neighbors(c, self.maxIndex, False):
+                    if a[n] == Solver.LINE:
+                        n += 1
+                if n!= num: return False
+        #incomplete
+        #Todo1 complete
+
+    def isValidPosition(self, saturated = True):
+        """
+        Checks if current state(may still be incomplete) of 'puzzle.numArray' is
+        valid, which depends on following conditions:
+        1) If a completed loop exists it must contain all lines on the puzzle.
+        3) All numbers are surrounded by as many number of lines (condition
+           of saturation)
+        """
+        #incomplete
+        #Todo1 complete
 
 
+class OptiSolver(Solver):
+    """
+    Optimal version of 'Solver' class. Tracks only 'active' cells rather than
+    serially checking the entire array.
+    Builds upon 'Solver' class overriding the 'basicElim' and 'dotElim'
+    function definitions.
+    """
+    def __init__(self, numArray, debug=True):
+        Solver.__init__(self, numArray, debug)
+        self.active = []
+
+    def startSolve(self):
+        """
+        Initiates the solve by searching for '0' and also populates
+        the 'active' list for the first time
+        """
+        n = self.numArray
+        yMax, xMax = numArray.size()
+        for y in range(yMax):
+            for x in range(xMax):
+                if n[y,x] == '0':
+                    self.active.append((y,x))
+                    self.active.append(list(n.neighbors((y,x), self.maxIndex, False)))
+
+    def basicElim(self):
+        """
+        Same as Solver.basicElim but only operates upon cells in the 'active'
+        list, and also modifies the list by adding more
+        """
 
 puzzles = []
 
@@ -377,11 +525,8 @@ solution1 = [(0,1),(0,3),(0,7),(0,13),
 
 
 def main():
-    b = Board()
-    #for p in solution1: b.lines[p] = Board.LINE
-    b.inject(puzzles[0])
-    #print l
-    b.pretty()
+    b = Board(False)
+    b.inject(puzzles[8])
     return b
 
 def config():
@@ -409,10 +554,29 @@ def config():
         puzzles = pickle.load(f)
 
 def addToPuzzles():
-    b.inputNum()
-    puzzles.append(b.numArray)
-    with open(__file__.replace('loop.py','puzzles.pkl'),'w') as f:
-        pickle.dump(puzzles, f)
+    r = b.inputNum()
+    if r:
+        puzzles.append(b.numArray)
+        with open(__file__.replace('loop.py','puzzles.pkl'),'w') as f:
+            pickle.dump(puzzles, f)
+
+def testInput():
+    r = b.inputNum()
+    if r: print b
+
+def solve():
+    print "="*70
+    for i in range(len(puzzles)):
+        s = Solver(puzzles[i], False)
+        flag, f1, f2 = True, True, True
+        runs = 0
+        while flag:
+            f1 = s.basicElimFull()
+            f2 = s.dotElim()
+            runs += 1
+            flag = (f1 or f2)
+        s.puzzle.pretty()
+        print "\nPuzzle#{}     Iterations: {}\n\n".format(i+1,runs)
 
 if __name__ == "__main__":
     #print os.path.realpath(__file__)
@@ -420,15 +584,7 @@ if __name__ == "__main__":
     b = main()
     n = b.numArray
     #addToPuzzles()
-    s = Solver(puzzles[8])
-    s.basicElim()
-    s.puzzle.pretty()
-    s.basicElim()
-    s.puzzle.pretty()
-    s.basicElim()
-    s.puzzle.pretty()
-    s.dotElim()
-    s.puzzle.pretty()
+    solve()
 
 
 
@@ -490,12 +646,19 @@ puzzles = [array([[ 3, 2, 3, 3, 2, 1, 3],
                   [-1, 2,-1, 2, 3, 2, 2],
                   [ 3, 1,-1,-1, 2, 2,-1],
                   [ 3, 2,-1,-1, 3,-1,-1],
-                  [-1,-1,-1,-1, 3,-1, 3]])
+                  [-1,-1,-1,-1, 3,-1, 3]]),
            array([[ 3, 3, 2, 3, 1,-1, 3],  # with the flow
                   [ 2,-1, 2,-1, 2, 2,-1],
                   [ 3,-1,-1,-1,-1, 2, 2],
                   [ 3,-1, 1,-1, 2,-1, 1],
                   [ 2, 3,-1,-1, 2,-1,-1],
                   [ 2, 2, 0,-1,-1,-1, 1],
-                  [-1, 3, 3, 3, 3,-1,-1]])]
+                  [-1, 3, 3, 3, 3,-1,-1]]),
+           array([[-1, 3, 2,-1,-1,-1,-1],  # fastest
+                  [-1,-1,-1, 3, 1,-1, 1],
+                  [-1,-1, 2,-1,-1, 3,-1],
+                  [ 3, 2,-1, 1,-1, 0, 3],
+                  [ 2,-1,-1, 3,-1,-1, 2],
+                  [ 3,-1,-1,-1,-1,-1, 2],
+                  [-1,-1,-1,-1,-1,-1,-1]])]
 '''

@@ -10,25 +10,11 @@ $(document).ready(function() {
     // Varaibles for holding data about numbers and filled lines
     var numArray = Array(7);
     for (var i=0; i<7; i++) { numArray[i] = [-1, -1, -1, -1, -1, -1, -1]; }    
-    
-    // pastebin api variables
-    var key          = '4729cb33284750f5bd3714d120641b7e',
-        paste_option = 'paste',
-        paste_status = '1',
-        paste_expire = '10M',
-        paste_format = 'python',
-        api_url      = 'http://pastebin.com/api/api_post.php';
-    
-    var refine = function(n) {
-        if (n<0) {
-            return n.toString();
-        } else {
-            return ' ' + n.toString();
-        }
-    }
+    var posNum = [-1,0,1,2,3];
+    var boardLocked = false;
     
     var line = function(dir, y, x) {
-        s = '<div class="element {0}-line line" id="{0}{1}-{2}"></div>';
+        s = '<div class="element {0}-line line nd" id="{0}{1}-{2}"></div>';
         return s.replace(/\{0\}/g, dir).replace("{1}", y).replace("{2}", x); 
     }
     
@@ -51,6 +37,27 @@ $(document).ready(function() {
         $board.append(line('v', y, 2*7));
     }
     
+    var refine = function(n) {
+        if (n<0) {
+            return n.toString();
+        } else {
+            return ' ' + n.toString();
+        }
+    }
+    
+    var parseURL = function() {
+        var keyValPairs, keyVal, l,
+            obj = {};
+        keyValPairs = window.location.search.slice(1).split("&");
+        for (var i=0; i<keyValPairs.length; i++) {
+            keyVal = keyValPairs[i];
+            l = keyVal.split("=");
+            obj[l[0]] = l[1];
+        }
+        console.log(obj);
+        return obj;
+    }
+    
     var init = function() {
         
         $board.css({width: bdim, height: bdim});
@@ -61,11 +68,15 @@ $(document).ready(function() {
         }
         printH(2*7);
         if (window.location.search) { // only if url-parameters are passed
-            array = window.location.search.split("=")[1]; //encoded array string
+            array = parseURL()['param']; //encoded array string
             array = decodeURIComponent(array)      //decoded array string
             numArray = eval(array);                //array
             console.log("Numeric Array via URL: ", numArray);
             config();
+            if (parseURL()['lock'] === 'true') {
+                boardLocked = true;
+                console.log("Locked")
+            }
         }
     }
     
@@ -87,27 +98,26 @@ $(document).ready(function() {
     init();
     
     $('.line').click(function() {
-        $(this).toggleClass("dark");
-    });
-    
-    $('#panel').mouseenter(function() {
-        $(this).animate({borderRadius: '+=20px'}, 200);
-    });
-    $('#panel').mouseleave(function() {
-        $(this).animate({borderRadius: '-=20px'}, 400);
+        $(this).toggleClass("dark nd");
     });
         
     $('.entry').click(function() {
-        var s = (this.id).split("-");
-        var n = parseInt(prompt("Number"))||(-1);
-        if (n!=(-1)) { $(this).text(n) }
-        numArray[parseInt(s[0])][parseInt(s[1])] = parseInt(n);
-        console.log(parseInt(s[0]), parseInt(s[1]));
-        console.log(numArray);
+        if (!boardLocked) {
+            var s = (this.id).slice(1).split("-");  // id of form "e1-0"
+            var y = parseInt(s[0]), x = parseInt(s[1]);
+            var n = posNum.indexOf(numArray[y][x]);
+            n = (n + 1) % 5;
+            s = posNum[n]
+            if (s!=(-1)) { 
+                $(this).text(s);
+            } else {
+                $(this).text(' ');
+            }
+            numArray[y][x] = s;
+        }
     });
     
     $('#panel').click(function() {
-    
         s = "["
         for (var i=0; i<7; i++) {
             s += "["
@@ -125,41 +135,53 @@ $(document).ready(function() {
             }
         }
         $('#text p').html(s)
-        /*
-        $.ajax({type    : "POST",
-                url     : api_url,
-                isLocal : true,
-                data    : { api_dev_key      : key,
-                            api_option       : paste_option,
-                            api_paste_private: paste_status,
-                            api_paste_expire : paste_expire,
-                            api_paste_format : paste_format,
-                            api_paste_code   : encodeURIComponent(numArray) },
-                dataType: "text",
-                success : function(data) {
-                            alert("success");
-                            console.log("Success\n" + data);
-                          }, 
-                error   : function(jqXHR, textStatus, errorThrown) {
-                            alert(textStatus);
-                            console.log("Error\n" + errorThrown);
-                            console.log("jqXHR");
-                            console.log(jqXHR);
-                          },
-                complete: function(jqXHR, textStatus) {
-                            alert(textStatus);
-                            console.log("Complete jqXHR");
-                            console.log(jqXHR);
-                          }
-                .done(function(data) 
-                {
-                    prompt("success");
-                    console.log("Success\n" + data);
-                }
-                  });
-                  
-        */
     });
     
+});      
+
     
-});
+    // pastebin api variables
+    /*
+    var key          = '4729cb33284750f5bd3714d120641b7e',
+        paste_option = 'paste',
+        paste_status = '1',
+        paste_expire = '10M',
+        paste_format = 'python',
+        api_url      = 'http://pastebin.com/api/api_post.php';
+    */
+
+
+/*
+    $.ajax({type    : "POST",
+            url     : api_url,
+            isLocal : true,
+            data    : { api_dev_key      : key,
+                        api_option       : paste_option,
+                        api_paste_private: paste_status,
+                        api_paste_expire : paste_expire,
+                        api_paste_format : paste_format,
+                        api_paste_code   : encodeURIComponent(numArray) },
+            dataType: "text",
+            success : function(data) {
+                        alert("success");
+                        console.log("Success\n" + data);
+                      }, 
+            error   : function(jqXHR, textStatus, errorThrown) {
+                        alert(textStatus);
+                        console.log("Error\n" + errorThrown);
+                        console.log("jqXHR");
+                        console.log(jqXHR);
+                      },
+            complete: function(jqXHR, textStatus) {
+                        alert(textStatus);
+                        console.log("Complete jqXHR");
+                        console.log(jqXHR);
+                      }
+            .done(function(data) 
+            {
+                prompt("success");
+                console.log("Success\n" + data);
+            }
+              });
+              
+        */

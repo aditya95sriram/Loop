@@ -47,6 +47,16 @@ h1 {
     cursor: pointer;
 }
 
+#panel, .element {
+    /*Make unselectable*/
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
 .dot {
     background: black;
     height: 10px;
@@ -55,11 +65,11 @@ h1 {
 }
 
 .line {
-    background: white;
+    background: #f2f2f2;
     border-radius: 2px;
 }
 
-.line:hover {
+.nd.line:hover {
     background: #bbbbbb;
 }
 
@@ -74,7 +84,6 @@ h1 {
 }
 
 .entry {
-    background: #fafafa;
     height: 50px;
     width: 50px;
     text-align: center;
@@ -84,5 +93,5 @@ h1 {
 }
 
 .dark {
-    background: gray;
+    background: gray;  !important
 }

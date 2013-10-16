@@ -48,20 +48,22 @@ class array(list):
         else:
             raise ValueError("Parameter 'key' must be tuple")
 
-    def neighbors(self, key, maxIndex, diagonal=True):
+    def neighbors(self, key, maxIndex, diagonal=True, d=1):
         """
         Returns indices of cells neighboring cell with given key as
         index as a generator.
         'maxIndex' is the maximum valid/possible index of the array
         'diagonal' specifies if the diagonally neighboring cells are to be
                    counted
+        'd'        specifies the distance in each direction; gives vague
+                   values when 'diagonal' is True also.
         """
         if isindex(key):
             y, x = key
-            nOffsets = [(i,j) for i in (-1,0,1) for j in (-1,0,1)]
+            nOffsets = [(i,j) for i in (-d,0,d) for j in (-d,0,d)]
             nOffsets.remove((0,0))
             if not diagonal:
-                for c in ((i,j) for i in (-1,1) for j in (-1,1)):
+                for c in ((i,j) for i in (-d,d) for j in (-d,d)):
                     nOffsets.remove(c)
             nPos = [(y+yOff, x+xOff) for yOff,xOff in nOffsets if isValidIndex((y+yOff, x+xOff), maxIndex)]
             for c in nPos:
@@ -483,27 +485,71 @@ class OptiSolver(Solver):
     function definitions.
     """
     def __init__(self, numArray, debug=True):
-        Solver.__init__(self, numArray, debug)
-        self.active = []
+        """
+        'numArray' must be an array of just the numbers.
+        """
+        self.numArray = array(numArray)
+        self.puzzle = Board()
+        self.puzzle.inject(self.numArray)
+        self.maxIndex = 14
+        self.debugMode = debug
+        self.activeCells, self.activeDots  = [], []
+
+    def append(self, cell, t, neighbor = False):
+        """
+        Append cells in args to self.activeCells or self.activeDots
+        according to l which can be "c"(cell) or "d"(dot).
+        If neighbor is True, it appends all the non-diagonal
+        neighbors of cell rather than the cell itself.
+        """
+        #convert = lambda c: (2*c[0]+1, 2*c[1]+1)
+        if t == "c":
+            appendTo = self.activeCells
+        elif t == "d":
+            appendTo = self.activeDots
+        else:
+            return
+        if neighbor:
+            for n in self.numArray.neighbors(cell, self.maxIndex, False, 2):
+                appendTo.append(n)
+        else:
+            appendTo.append(cell)
 
     def startSolve(self):
         """
         Initiates the solve by searching for '0' and also populates
         the 'active' list for the first time
         """
+        '''
         n = self.numArray
         yMax, xMax = numArray.size()
         for y in range(yMax):
             for x in range(xMax):
                 if n[y,x] == '0':
-                    self.active.append((y,x))
-                    self.active.append(list(n.neighbors((y,x), self.maxIndex, False)))
+                    self.append((y,x), "c", False)
+                    self.append((y,x), "c", True)
+        '''
+        cell = self.numArray.find(0)
+        self.append(map(lambda a:2*a+1, cell), "c", False)
 
-    def basicElim(self):
+    def basicElimFull(self):
         """
         Same as Solver.basicElim but only operates upon cells in the 'active'
         list, and also modifies the list by adding more
         """
+        active = self.activeCells
+        runs = 0
+        flag = False
+        while active:
+            cell = active.pop(0)
+            effective = self.basicElim(cell)
+            if effective:
+                flag = True
+                self.append(cell, "c", True)
+            runs += 1
+        self.log("Solved using basicElimFull in {} runs".format(runs))
+        return flag
+
 
 puzzles = []
 
@@ -567,6 +613,17 @@ def testInput():
 def solve():
     print "="*70
     for i in range(len(puzzles)):
+        s = OptiSolver(puzzles[i], False)
+        flag = True
+        runs = 0
+        while flag:
+            s.startSolve()
+            flag = s.basicElimFull()
+            runs += 1
+        s.puzzle.pretty()
+        print "\nPuzzle#{}     Iterations: {}\n\n".format(i+1,runs)
+    '''
+    for i in range(len(puzzles)):
         s = Solver(puzzles[i], False)
         flag, f1, f2 = True, True, True
         runs = 0
@@ -577,6 +634,7 @@ def solve():
             flag = (f1 or f2)
         s.puzzle.pretty()
         print "\nPuzzle#{}     Iterations: {}\n\n".format(i+1,runs)
+    '''
 
 if __name__ == "__main__":
     #print os.path.realpath(__file__)
@@ -585,6 +643,117 @@ if __name__ == "__main__":
     n = b.numArray
     #addToPuzzles()
     solve()
+    '''
+    s = OptiSolver(puzzles[8], True)
+    s.startSolve()
+    s.basicElimFull()
+    s.puzzle.pretty()
+    '''
+
+
+'''
+
+            Patterns repository (to be implemented)
+
+) Adjacent Threes (can be chained)
+    a) Horizontal
+    .   .   .       .   .   .
+      3   3     ==> | 3 | 3 |
+    .   .   .       .   .   .
+
+    b) Vertical
+    .   .       .___.
+      3           3
+    .   .   ==> .___.
+      3           3
+    .   .       .___.
+
+
+) Diagonal Threes
+
+    .   .   .       .___.   .
+      3             | 3
+    .   .   .   ==> .   .   .
+          3               3 |
+    .   .   .       .   .___.
+
+) Diagonal Threes with 2 in middle
+
+    .   .   .   .       .___.   .   .
+      3                 | 3
+    .   .   .   .   ==> .   .   .   .
+          2                   2
+    .   .   .   .       .   .   .   .
+              3                   3 |
+    .   .   .   .       .   .   .___.
+
+) Line near Three
+    a)
+    .   .   .       .   .___.
+          3     ==>       3 |
+    .___.   .       .___.   .
+
+    .   .   .       .   .   .
+
+    b)
+    .___.   .       .___.   .
+          3     ==>       3 |
+    .   .   .       .   .___.
+
+    .   .   .       .   .   .
+
+    c)
+    .   .   .       .   .___.
+          3             | 3
+    .   .   .   ==> .   .   .
+            |               |
+    .   .   .       .   .   .
+
+    d)
+    .   .   .       .   .___.
+          3               3 |
+    .   .   .   ==> .   .   .
+        |               |
+    .   .   .       .   .   .
+
+) 2 crosses diagonal to Three
+
+    .   .   .       .   .   .
+        x               x
+    . x .   .   ==> . x .___.
+          3             | 3
+    .   .   .       .   .   .
+
+) Three in a corner
+
+    .   .   .       .___.   .
+      3             | 3
+    .   .   .   ==> .   .   .
+
+    .   .   .       .   .   .
+
+) Two in a corner
+
+    .   .   .       .   .___.
+      2               2
+    .   .   .   ==> .   .   .
+                    |
+    .   .   .       .   .   .
+
+) One in a corner
+
+    .   .   .       . x .   .
+      1             x 1
+    .   .   .   ==> .   .   .
+
+    .   .   .       .   .   .
+'''
+
+
+
+
+
+
 
 
 
